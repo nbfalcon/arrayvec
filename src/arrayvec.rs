@@ -1113,14 +1113,37 @@ impl<T, const CAP: usize> ArrayVec<T, CAP> {
 
     /// Extend the ArrayVec with clones of elements from the slice;
     /// the length of the slice must be <= the remaining capacity in the arrayvec.
-    pub(crate) fn extend_from_slice(&mut self, slice: &[T])
+    pub fn extend_from_slice(&mut self, slice: &[T])
         where T: Clone
     {
-        let take = self.capacity() - self.len();
-        debug_assert!(slice.len() <= take);
+        let headroom = self.capacity() - self.len();
+        assert!(slice.len() <= headroom);
         unsafe {
-            let slice = if take < slice.len() { &slice[..take] } else { slice };
             self.extend_from_iter::<_, false>(slice.iter().cloned());
+        }
+    }
+
+    /// Resize the ArrayVec to new_len; truncate if new_len < self.len(), otherwise copy value.
+    /// ```
+    /// use arrayvec::ArrayVec;
+    /// let mut vec = ArrayVec::<u8, 128>::new();
+    /// vec.resize(50, 0xAB);
+    /// assert_eq!(vec.as_slice(), &[0xABu8; 50]);
+    /// ```
+    pub fn resize(&mut self, new_len: usize, value: T)
+        where T: Clone
+    {
+        debug_assert!(new_len <= self.capacity());
+        let len = self.len();
+
+        if new_len > len {
+            for _ in len..new_len {
+                unsafe {
+                    self.push_unchecked(value.clone())
+                }
+            }
+        } else {
+            self.truncate(new_len);
         }
     }
 }
